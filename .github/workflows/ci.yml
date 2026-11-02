@@ -1,4 +1,4 @@
-name: CI
+name: CI/CD
 
 # Run the pipeline on every push and on every pull request to main.
 on:
