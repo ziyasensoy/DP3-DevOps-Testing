@@ -13,8 +13,29 @@ function createApp(service = createTaskService()) {
 
   app.get("/api/tasks", (req, res) => res.json(service.list()));
 
+  app.get("/api/stats", (req, res) => res.json(service.stats()));
+
+  app.get("/api/tasks/:id", (req, res) => {
+    const task = service.get(Number(req.params.id));
+    if (!task) return res.status(404).json({ error: "Task not found" });
+    res.json(task);
+  });
+
   app.post("/api/tasks", (req, res) => {
     res.status(201).json(service.create(req.body));
+  });
+
+  app.patch("/api/tasks/:id", (req, res) => {
+    const task = service.update(Number(req.params.id), req.body || {});
+    if (!task) return res.status(404).json({ error: "Task not found" });
+    res.json(task);
+  });
+
+  app.delete("/api/tasks/:id", (req, res) => {
+    if (!service.remove(Number(req.params.id))) {
+      return res.status(404).json({ error: "Task not found" });
+    }
+    res.status(204).end();
   });
 
   // eslint-disable-next-line no-unused-vars
