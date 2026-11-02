@@ -26,6 +26,11 @@ jobs:
       - name: Run ESLint
         run: npm run lint
 
+      # Fail if a package that ships in the app has a high or critical vulnerability.
+      # Dev tools (jest, eslint) are left out because they don't end up in the image.
+      - name: Check dependencies for vulnerabilities
+        run: npm audit --omit=dev --audit-level=high
+
   test:
     # Only run the tests when lint has passed.
     needs: lint
