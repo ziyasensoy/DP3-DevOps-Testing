@@ -10,13 +10,23 @@
     "lint": "eslint .",
     "test": "jest",
     "test:unit": "jest tests/unit",
-    "test:integration": "jest tests/integration"
+    "test:integration": "jest tests/integration",
+    "test:coverage": "jest --coverage"
   },
   "engines": {
     "node": ">=20"
   },
   "jest": {
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "collectCoverageFrom": [
+      "src/**/*.js",
+      "!src/server.js"
+    ],
+    "coverageReporters": [
+      "text",
+      "lcov",
+      "json-summary"
+    ]
   },
   "dependencies": {
     "express": "^4.22.3"
