@@ -61,7 +61,9 @@
     }
 
     async function render() {
-      const tasks = await api('GET', '/api/tasks');
+      const [tasks, stats] = await Promise.all([api('GET', '/api/tasks'), api('GET', '/api/stats')]);
+      document.getElementById('stats').textContent =
+        `${stats.total} tasks · ${stats.done} done · ${stats.overdue} overdue · ${stats.hoursPlanned} h planned`;
 
       const items = tasks.map((t) => {
         const li = el('li', t.done ? 'done' : '');
