@@ -1,8 +1,10 @@
 // Unit tests
 const {
+  createTaskService,
   validateTask,
   urgencyScore,
   daysUntil,
+  ValidationError,
 } = require("../../src/taskService");
 
 const NOW = new Date(2026, 10, 3, 12, 0, 0); // 3 Nov 2026, 12:00 local
@@ -112,5 +114,51 @@ describe("urgencyScore", () => {
       NOW,
     );
     expect(score).toBeLessThanOrEqual(100);
+  });
+});
+
+describe("createTaskService", () => {
+  let service;
+  beforeEach(() => {
+    service = createTaskService();
+  });
+
+  test("creates tasks with defaults and incrementing ids", () => {
+    const a = service.create({ title: "  First  " });
+    const b = service.create({ title: "Second" });
+    expect(a).toMatchObject({
+      id: 1,
+      title: "First",
+      priority: "medium",
+      done: false,
+      deadline: null,
+    });
+    expect(b.id).toBe(2);
+  });
+
+  test("throws ValidationError on invalid input", () => {
+    expect(() => service.create({ title: "" })).toThrow(ValidationError);
+  });
+
+  test("list is sorted by urgency, highest first", () => {
+    service.create({ title: "Low later", priority: "low" });
+    service.create({
+      title: "High overdue",
+      priority: "high",
+      deadline: new Date(2026, 10, 1),
+    });
+    const titles = service.list(NOW).map((t) => t.title);
+    expect(titles).toEqual(["High overdue", "Low later"]);
+  });
+
+  test("update returns null for unknown id", () => {
+    expect(service.update(999, { title: "x" })).toBeNull();
+  });
+
+  test("remove deletes a task once", () => {
+    const t = service.create({ title: "Task" });
+    expect(service.remove(t.id)).toBe(true);
+    expect(service.remove(t.id)).toBe(false);
+    expect(service.get(t.id)).toBeNull();
   });
 });
