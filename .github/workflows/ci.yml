@@ -58,6 +58,12 @@ jobs:
     # Only build the image when the tests have passed.
     needs: test
     runs-on: ubuntu-latest
+    # Allow this job to push images to GitHub Container Registry.
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ghcr.io/ziyasensoy/study-planner
     steps:
       - name: Check out the code
         uses: actions/checkout@v4
@@ -77,3 +83,21 @@ jobs:
           done
           docker logs study-planner
           exit 1
+
+      # Only publish the image for pushes to main, not for pull requests.
+      - name: Log in to GitHub Container Registry
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Tag the image with "latest" and with the commit id, then push both.
+      - name: Push the image
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          docker tag study-planner $IMAGE:latest
+          docker tag study-planner $IMAGE:${{ github.sha }}
+          docker push $IMAGE:latest
+          docker push $IMAGE:${{ github.sha }}
