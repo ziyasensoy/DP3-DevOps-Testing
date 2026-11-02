@@ -71,11 +71,14 @@
         done.type = 'checkbox';
         done.checked = t.done;
         done.onchange = () => api('PATCH', `/api/tasks/${t.id}`, { done: done.checked }).then(render);
+        const remove = el('button', '', '✕');
+        remove.onclick = () => api('DELETE', `/api/tasks/${t.id}`).then(render);
         li.append(
           done,
           el('span', 'urgency', t.urgency),
           el('span', 'title', t.title),
           el('span', 'meta', `${t.priority} · ${describeDays(t.daysLeft)}`),
+          remove,
         );
         return li;
       });
