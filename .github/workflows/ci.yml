@@ -53,3 +53,27 @@ jobs:
         with:
           name: coverage-report
           path: coverage/
+
+  docker:
+    # Only build the image when the tests have passed.
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Build the Docker image
+        run: docker build -t study-planner .
+
+      - name: Start the container
+        run: docker run -d --name study-planner -p 3000:3000 study-planner
+
+      # Check that the app inside the container actually answers.
+      - name: Smoke test the health route
+        run: |
+          for i in $(seq 1 10); do
+            curl -sf http://localhost:3000/health && exit 0
+            sleep 1
+          done
+          docker logs study-planner
+          exit 1

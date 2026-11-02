@@ -49,3 +49,4 @@ GitHub Actions (`.github/workflows/ci.yml`) runs on every push and pull request 
 
 1. **Lint**: ESLint checks the code.
 2. **Test**: runs unit and integration tests with coverage, and uploads the coverage report.
+3. **Docker**: builds the image, starts the container and checks that `/health` answers.
