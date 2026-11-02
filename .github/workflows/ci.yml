@@ -89,6 +89,15 @@ jobs:
           docker logs study-planner
           exit 1
 
+      # Scan the image for known vulnerabilities. Fail on high or critical ones
+      # that already have a fix, so we never push an image with a fixable problem.
+      - name: Scan the image with Trivy
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.76.1 image \
+            --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 \
+            study-planner
+
       # Only publish the image for pushes to main, not for pull requests.
       - name: Log in to GitHub Container Registry
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
