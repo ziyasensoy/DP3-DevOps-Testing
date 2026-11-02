@@ -1,0 +1,31 @@
+{
+  "name": "study-planner",
+  "version": "1.0.0",
+  "description": "DP3 DevOps & Testing — a small study-task planner API used to demonstrate a CI/CD pipeline and a testing strategy.",
+  "main": "src/server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "lint": "eslint .",
+    "test": "jest",
+    "test:unit": "jest tests/unit",
+    "test:integration": "jest tests/integration"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "jest": {
+    "testEnvironment": "node"
+  },
+  "dependencies": {
+    "express": "^4.22.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "globals": "^15.15.0",
+    "jest": "^29.7.0",
+    "supertest": "^7.3.1"
+  }
+}
