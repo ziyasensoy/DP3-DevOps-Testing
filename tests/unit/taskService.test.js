@@ -179,4 +179,21 @@ describe("createTaskService", () => {
     expect(service.remove(t.id)).toBe(false);
     expect(service.get(t.id)).toBeNull();
   });
+
+  test("stats summarises open, done, overdue and hours", () => {
+    service.create({ title: "A", estimatedHours: 2 });
+    service.create({
+      title: "B",
+      estimatedHours: 3,
+      deadline: new Date(2026, 9, 1),
+    });
+    const c = service.create({ title: "C", estimatedHours: 5 });
+    service.update(c.id, { done: true });
+    expect(service.stats(NOW)).toEqual({
+      total: 3,
+      done: 1,
+      overdue: 1,
+      hoursPlanned: 5,
+    });
+  });
 });

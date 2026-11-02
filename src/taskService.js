@@ -144,6 +144,19 @@ function createTaskService() {
       tasks = tasks.filter((t) => t.id !== id);
       return tasks.length < before;
     },
+
+    stats(now = new Date()) {
+      const open = tasks.filter((t) => !t.done);
+      return {
+        total: tasks.length,
+        done: tasks.length - open.length,
+        overdue: open.filter((t) => {
+          const d = daysUntil(t.deadline, now);
+          return d !== null && d < 0;
+        }).length,
+        hoursPlanned: open.reduce((sum, t) => sum + (t.estimatedHours || 0), 0),
+      };
+    },
   };
 }
 
