@@ -1,8 +1,8 @@
 # Study Planner
 
-![CI](https://github.com/ziyasensoy/DP3-DevOps-Testing/actions/workflows/ci.yml/badge.svg)
+![CI/CD](https://github.com/ziyasensoy/DP3-DevOps-Testing/actions/workflows/ci.yml/badge.svg)
 
-A small study-task planner made for DP3 DevOps & Testing. It's an Express API with a simple web page. You can add study tasks with a deadline and the hours they need, mark them as done, and see stats. The project shows a CI pipeline and a testing approach.
+A small study-task planner made for DP3 DevOps & Testing. It's an Express API with a simple web page. You can add study tasks with a deadline and the hours they need, mark them as done, and see stats. The project shows a CI/CD pipeline and a testing approach.
 
 ## Run it locally
 
@@ -54,7 +54,7 @@ Before the first e2e run, install the browser once with `npx playwright install 
 | DELETE | `/api/tasks/:id` | Delete a task        |
 | GET    | `/api/stats`     | Task statistics      |
 
-## CI pipeline
+## CI/CD pipeline
 
 GitHub Actions (`.github/workflows/ci.yml`) runs on every push and pull request to `main`:
 
