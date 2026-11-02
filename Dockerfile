@@ -4,7 +4,9 @@ ENV NODE_ENV=production
 
 # Install only the production dependencies first, so Docker can cache this layer.
 COPY package*.json ./
-RUN npm ci --omit=dev
+
+RUN npm ci --omit=dev \
+  && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
 COPY src ./src
 
