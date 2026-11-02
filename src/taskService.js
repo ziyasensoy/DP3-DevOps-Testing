@@ -83,4 +83,73 @@ function urgencyScore(task, now = new Date()) {
   return Math.min(100, priorityWeight + timeWeight + workloadWeight);
 }
 
-module.exports = { validateTask, urgencyScore, daysUntil, ValidationError };
+function createTaskService() {
+  let tasks = [];
+  let nextId = 1;
+
+  return {
+    list(now = new Date()) {
+      return tasks
+        .map((t) => ({
+          ...t,
+          urgency: urgencyScore(t, now),
+          daysLeft: daysUntil(t.deadline, now),
+        }))
+        .sort((a, b) => b.urgency - a.urgency || a.id - b.id);
+    },
+
+    get(id) {
+      return tasks.find((t) => t.id === id) || null;
+    },
+
+    create(input) {
+      const errors = validateTask(input);
+      if (errors.length) throw new ValidationError(errors.join("; "));
+      const task = {
+        id: nextId++,
+        title: input.title.trim(),
+        deadline: input.deadline ? new Date(input.deadline).toISOString() : null,
+        priority: input.priority || "medium",
+        estimatedHours: input.estimatedHours ?? null,
+        done: false,
+      };
+      tasks.push(task);
+      return task;
+    },
+
+    update(id, changes) {
+      const task = this.get(id);
+      if (!task) return null;
+      const merged = { ...task, ...changes };
+      const errors = validateTask(merged);
+      if (errors.length) throw new ValidationError(errors.join("; "));
+      if (changes.done !== undefined && typeof changes.done !== "boolean") {
+        throw new ValidationError("Done must be true or false");
+      }
+      Object.assign(task, {
+        title: merged.title.trim(),
+        deadline: merged.deadline
+          ? new Date(merged.deadline).toISOString()
+          : null,
+        priority: merged.priority,
+        estimatedHours: merged.estimatedHours ?? null,
+        done: merged.done,
+      });
+      return task;
+    },
+
+    remove(id) {
+      const before = tasks.length;
+      tasks = tasks.filter((t) => t.id !== id);
+      return tasks.length < before;
+    },
+  };
+}
+
+module.exports = {
+  createTaskService,
+  validateTask,
+  urgencyScore,
+  daysUntil,
+  ValidationError,
+};
