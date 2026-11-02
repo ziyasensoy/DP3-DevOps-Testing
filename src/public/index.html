@@ -85,6 +85,24 @@
       document.getElementById('tasks').replaceChildren(...items);
     }
 
+    document.getElementById('form').onsubmit = async (event) => {
+      event.preventDefault();
+      const form = event.target;
+      const f = form.elements;
+      const task = { title: f.title.value, priority: f.priority.value };
+      // Treat the deadline as the end of that day in the user's own timezone.
+      if (f.deadline.value) task.deadline = `${f.deadline.value}T23:59`;
+      if (f.estimatedHours.value) task.estimatedHours = Number(f.estimatedHours.value);
+      try {
+        await api('POST', '/api/tasks', task);
+        form.reset();
+        document.getElementById('error').textContent = '';
+        render();
+      } catch (err) {
+        document.getElementById('error').textContent = err.message;
+      }
+    };
+
     render();
   </script>
 </body>
