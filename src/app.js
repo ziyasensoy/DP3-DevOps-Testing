@@ -1,3 +1,4 @@
+const path = require("path");
 const express = require("express");
 const { createTaskService, ValidationError } = require("./taskService");
 const { version } = require("../package.json");
@@ -5,6 +6,7 @@ const { version } = require("../package.json");
 function createApp(service = createTaskService()) {
   const app = express();
   app.use(express.json());
+  app.use(express.static(path.join(__dirname, "public")));
 
   // Health check used by Docker HEALTHCHECK and the pipeline smoke test.
   app.get("/health", (req, res) => {
