@@ -151,6 +151,24 @@ describe("createTaskService", () => {
     expect(titles).toEqual(["High overdue", "Low later"]);
   });
 
+  test("update changes fields and validates", () => {
+    const t = service.create({ title: "Task" });
+    expect(service.update(t.id, { done: true }).done).toBe(true);
+    expect(() => service.update(t.id, { priority: "nope" })).toThrow(
+      ValidationError,
+    );
+    expect(() => service.update(t.id, { done: "yes" })).toThrow(
+      "Done must be true or false",
+    );
+  });
+
+  // Regression test: tasks created without optional fields store them as null,
+  // which used to make every later update fail validation.
+  test("regression: a task without hours/deadline can still be updated", () => {
+    const t = service.create({ title: "No optional fields" });
+    expect(() => service.update(t.id, { title: "Renamed" })).not.toThrow();
+  });
+
   test("update returns null for unknown id", () => {
     expect(service.update(999, { title: "x" })).toBeNull();
   });

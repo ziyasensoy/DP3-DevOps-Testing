@@ -23,7 +23,8 @@ function validateTask(input) {
   } else if (input.title.trim().length > 100) {
     errors.push("Title must be at most 100 characters");
   }
-  if (input.deadline !== undefined) {
+  // null means "not set" (that is how optional fields are stored), so treat it like undefined.
+  if (input.deadline !== undefined && input.deadline !== null) {
     const date = new Date(input.deadline);
     if (Number.isNaN(date.getTime())) {
       errors.push("Deadline must be a valid date");
@@ -35,7 +36,7 @@ function validateTask(input) {
   ) {
     errors.push(`Priority must be one of: ${VALID_PRIORITIES.join(", ")}`);
   }
-  if (input.estimatedHours !== undefined) {
+  if (input.estimatedHours !== undefined && input.estimatedHours !== null) {
     const h = input.estimatedHours;
     if (typeof h !== "number" || !Number.isFinite(h) || h <= 0 || h > 100) {
       errors.push("Estimated hours must be a number between 0 and 100");
