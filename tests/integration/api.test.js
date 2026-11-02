@@ -87,4 +87,10 @@ describe("Tasks API", () => {
     expect(res.status).toBe(500);
     expect(res.body).toEqual({ error: "Internal server error" });
   });
+
+  test("serves the frontend", async () => {
+    const res = await request(app).get("/");
+    expect(res.status).toBe(200);
+    expect(res.text).toContain("Study Planner");
+  });
 });
