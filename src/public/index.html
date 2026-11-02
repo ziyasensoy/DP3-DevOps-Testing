@@ -34,5 +34,48 @@
   <p id="error"></p>
 
   <ul id="tasks"></ul>
+
+  <script>
+    async function api(method, url, body) {
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      return res.status === 204 ? null : res.json();
+    }
+
+    function describeDays(days) {
+      if (days === null) return 'no deadline';
+      if (days < 0) return `${-days} day(s) overdue`;
+      if (days === 0) return 'due today';
+      return `${days} day(s) left`;
+    }
+
+    function el(tag, className, text) {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text !== undefined) node.textContent = text;
+      return node;
+    }
+
+    async function render() {
+      const tasks = await api('GET', '/api/tasks');
+
+      const items = tasks.map((t) => {
+        const li = el('li', t.done ? 'done' : '');
+        li.append(
+          el('span', 'urgency', t.urgency),
+          el('span', 'title', t.title),
+          el('span', 'meta', `${t.priority} · ${describeDays(t.daysLeft)}`),
+        );
+        return li;
+      });
+      document.getElementById('tasks').replaceChildren(...items);
+    }
+
+    render();
+  </script>
 </body>
 </html>
