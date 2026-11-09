@@ -8,6 +8,38 @@ on:
     branches: [main]
 
 jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Every job runs on a clean machine. Save node_modules and the Playwright
+      # browser in a cache, so the next jobs can reuse them instead of installing again.
+      # The key changes when package-lock.json changes, so the cache is never outdated.
+      - name: Cache dependencies
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            ~/.cache/ms-playwright
+          key: deps-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      # Only install when there was no cache for this package-lock.json yet.
+      - name: Install dependencies
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: npm ci
+
+      - name: Install the Chromium browser
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: npx playwright install chromium
+
   lint:
     runs-on: ubuntu-latest
     steps:
