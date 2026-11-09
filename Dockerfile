@@ -10,6 +10,10 @@ RUN npm ci --omit=dev \
 
 COPY src ./src
 
+# Put the commit id in the image, so /health shows which version is running.
+ARG GIT_SHA=local
+ENV GIT_SHA=$GIT_SHA
+
 # Run as the non-root "node" user that the official image provides.
 USER node
 EXPOSE 3000

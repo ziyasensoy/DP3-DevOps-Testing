@@ -47,7 +47,7 @@ jobs:
         run: npx playwright install chromium
 
       - name: Build the Docker image
-        run: docker build -t study-planner .
+        run: docker build --build-arg GIT_SHA=${{ github.sha }} -t study-planner .
 
       - name: Start the container
         run: docker run -d --name study-planner -p 3000:3000 study-planner
