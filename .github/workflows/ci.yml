@@ -204,3 +204,47 @@ jobs:
           done
           echo "Staging did not get the new version within 10 minutes"
           exit 1
+
+  deploy-production:
+    # Only deploy to production after staging got the new version.
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    # The "production" environment needs a manual approval in GitHub before this job starts.
+    environment:
+      name: production
+      url: ${{ vars.RENDER_URL }}
+    # Allow this job to add the "latest" tag in GitHub Container Registry.
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      # Deploy exactly the same image that was tested on staging.
+      - name: Deploy the image to Render
+        run: curl -fsS -G "$DEPLOY_HOOK" --data-urlencode "imgURL=$IMAGE:${{ github.sha }}"
+        env:
+          DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+
+      - name: Check that production runs the new version
+        run: |
+          for i in $(seq 1 60); do
+            commit=$(curl -s "${{ vars.RENDER_URL }}/health" | jq -r '.commit' 2>/dev/null || true)
+            if [ "$commit" = "${{ github.sha }}" ]; then
+              echo "Production runs commit $commit"
+              exit 0
+            fi
+            echo "Production still runs '$commit', waiting..."
+            sleep 10
+          done
+          echo "Production did not get the new version within 10 minutes"
+          exit 1
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Mark this version as "latest", so "latest" always means "what runs in production".
+      - name: Tag the image as latest
+        run: docker buildx imagetools create -t $IMAGE:latest $IMAGE:${{ github.sha }}
