@@ -10,6 +10,12 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Allow this job to push images to GitHub Container Registry.
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ghcr.io/ziyasensoy/study-planner
     steps:
       - name: Check out the code
         uses: actions/checkout@v4
@@ -39,6 +45,48 @@ jobs:
       - name: Install the Chromium browser
         if: steps.cache.outputs.cache-hit != 'true'
         run: npx playwright install chromium
+
+      - name: Build the Docker image
+        run: docker build -t study-planner .
+
+      - name: Start the container
+        run: docker run -d --name study-planner -p 3000:3000 study-planner
+
+      # Check that the app inside the container actually answers.
+      - name: Smoke test the health route
+        run: |
+          for i in $(seq 1 10); do
+            curl -sf http://localhost:3000/health && exit 0
+            sleep 1
+          done
+          docker logs study-planner
+          exit 1
+
+      # Scan the image for known vulnerabilities. Fail on high or critical ones
+      # that already have a fix, so we never push an image with a fixable problem.
+      - name: Scan the image with Trivy
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.76.1 image \
+            --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 \
+            study-planner
+
+      # Only publish the image for pushes to main, not for pull requests.
+      - name: Log in to GitHub Container Registry
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Push the image tagged with the commit id, so the deploy jobs can use
+      # exactly this version. It is only deployed after lint and tests pass.
+      - name: Push the image
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          docker tag study-planner $IMAGE:${{ github.sha }}
+          docker push $IMAGE:${{ github.sha }}
 
   lint:
     # Only lint after the build job has installed the dependencies.
@@ -122,60 +170,3 @@ jobs:
         with:
           name: playwright-report
           path: playwright-report/
-
-  docker:
-    # Only build the image when all tests have passed.
-    needs: test
-    runs-on: ubuntu-latest
-    # Allow this job to push images to GitHub Container Registry.
-    permissions:
-      contents: read
-      packages: write
-    env:
-      IMAGE: ghcr.io/ziyasensoy/study-planner
-    steps:
-      - name: Check out the code
-        uses: actions/checkout@v4
-
-      - name: Build the Docker image
-        run: docker build -t study-planner .
-
-      - name: Start the container
-        run: docker run -d --name study-planner -p 3000:3000 study-planner
-
-      # Check that the app inside the container actually answers.
-      - name: Smoke test the health route
-        run: |
-          for i in $(seq 1 10); do
-            curl -sf http://localhost:3000/health && exit 0
-            sleep 1
-          done
-          docker logs study-planner
-          exit 1
-
-      # Scan the image for known vulnerabilities. Fail on high or critical ones
-      # that already have a fix, so we never push an image with a fixable problem.
-      - name: Scan the image with Trivy
-        run: |
-          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-            aquasec/trivy:0.76.1 image \
-            --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 \
-            study-planner
-
-      # Only publish the image for pushes to main, not for pull requests.
-      - name: Log in to GitHub Container Registry
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      # Tag the image with "latest" and with the commit id, then push both.
-      - name: Push the image
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          docker tag study-planner $IMAGE:latest
-          docker tag study-planner $IMAGE:${{ github.sha }}
-          docker push $IMAGE:latest
-          docker push $IMAGE:${{ github.sha }}
