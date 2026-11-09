@@ -23,11 +23,22 @@ docker run -d --name study-planner -p 3000:3000 study-planner
 
 The container runs as a non-root user, and Docker checks `/health` to see if the app is still working.
 
-Every green build on `main` also publishes the image to GitHub Container Registry:
+Every build on `main` publishes the image to GitHub Container Registry, tagged with the commit id. The version that runs in production is also tagged `latest`:
 
 ```bash
 docker run -d -p 3000:3000 ghcr.io/ziyasensoy/study-planner:latest
 ```
+
+## Live environments
+
+The app runs on [Render](https://render.com) :
+
+| Environment | URL                                           |
+| ----------- | --------------------------------------------- |
+| Staging     | https://study-planner-staging.onrender.com    |
+| Production  | https://study-planner-production.onrender.com |
+
+`/health` shows which commit is running.
 
 ## Tests
 
@@ -44,23 +55,28 @@ Before the first e2e run, install the browser once with `npx playwright install 
 
 ## API
 
-| Method | Route            | What it does         |
-| ------ | ---------------- | -------------------- |
-| GET    | `/health`        | Health check         |
-| GET    | `/api/tasks`     | List all tasks       |
-| GET    | `/api/tasks/:id` | Get one task         |
-| POST   | `/api/tasks`     | Create a task        |
-| PATCH  | `/api/tasks/:id` | Update a task        |
-| DELETE | `/api/tasks/:id` | Delete a task        |
-| GET    | `/api/stats`     | Task statistics      |
+| Method | Route            | What it does    |
+| ------ | ---------------- | --------------- |
+| GET    | `/health`        | Health check    |
+| GET    | `/api/tasks`     | List all tasks  |
+| GET    | `/api/tasks/:id` | Get one task    |
+| POST   | `/api/tasks`     | Create a task   |
+| PATCH  | `/api/tasks/:id` | Update a task   |
+| DELETE | `/api/tasks/:id` | Delete a task   |
+| GET    | `/api/stats`     | Task statistics |
 
 ## CI/CD pipeline
 
 GitHub Actions (`.github/workflows/ci.yml`) runs on every push and pull request to `main`:
 
-1. **Lint**: ESLint checks the code, and `npm audit` checks the app's dependencies for high or critical vulnerabilities.
-2. **Test**: runs unit and integration tests with coverage (fails below 80%), and uploads the coverage report.
-3. **E2E**: runs the Playwright tests in Chromium, and uploads the Playwright report.
-4. **Docker**: builds the image, checks that `/health` answers, and scans the image with Trivy. On `main` it then pushes the image to GitHub Container Registry.
+```
+build → lint → test → deploy staging → deploy production
+```
 
-Each stage only runs if the one before it passed.
+1. **Build**: installs the dependencies and the Playwright browser, and caches them for the next jobs. Builds the Docker image, checks that `/health` answers, and scans the image with Trivy. On `main` it pushes the image to GitHub Container Registry.
+2. **Lint**: ESLint checks the code, and `npm audit` checks the app's dependencies for high or critical vulnerabilities.
+3. **Test**: runs unit and integration tests with coverage (fails below 80%), then the Playwright end-to-end tests. Uploads both reports.
+4. **Deploy staging**: deploys the image of this commit to Render, and waits until staging runs that commit.
+5. **Deploy production**: needs a manual approval in GitHub first. Then deploys the same image to production and tags it `latest`.
+
+Each job only runs if the one before it passed. Pull requests run build, lint and test, but are never deployed.
