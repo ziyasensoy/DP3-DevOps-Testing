@@ -41,6 +41,8 @@ jobs:
         run: npx playwright install chromium
 
   lint:
+    # Only lint after the build job has installed the dependencies.
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - name: Check out the code
@@ -50,10 +52,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      # Reuse what the build job installed. Fail if it's missing,
+      # so we notice it instead of silently running without packages.
+      - name: Restore dependencies from the build job
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            node_modules
+            ~/.cache/ms-playwright
+          key: deps-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          fail-on-cache-miss: true
 
       - name: Run ESLint
         run: npm run lint
