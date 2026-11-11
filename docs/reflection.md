@@ -2,19 +2,20 @@
 
 ## 1. What I built (OR2)
 
-For my Study Planner project I set up a CI/CD pipeline with GitHub Actions. It runs on every push and pull request to `main`, in five jobs:
+For my Study Planner project I set up a CI/CD pipeline with GitHub Actions. It runs on every push and pull request to `main`, in six jobs:
 
 ```
-build → lint → test → deploy staging → deploy production
+build → lint → test → deploy staging → deploy production → rollback production
 ```
 
 1. **Build**: installs the dependencies and the Playwright browser once, and passes them to the next jobs with a cache. It builds the Docker image, checks that `/health` answers, scans the image with Trivy and pushes it to GitHub Container Registry, tagged with the commit id.
 2. **Lint**: ESLint checks code style and common mistakes. `npm audit` checks the app's dependencies for high or critical vulnerabilities.
 3. **Test**: all tests in one place. First the unit and integration tests with Jest (fails below 80% coverage), then the end-to-end tests with Playwright.
 4. **Deploy staging**: deploys the image of this commit to a staging environment on Render, and waits until staging really runs that commit.
-5. **Deploy production**: only starts after I approve it manually in GitHub. It deploys the same image to production and tags it `latest`.
+5. **Deploy production**: only starts after I approve it manually in GitHub. It remembers which version production runs now, deploys the same image as staging, checks the version and runs a smoke test on the page and the API. Only then is the image tagged `latest`.
+6. **Rollback production**: only runs when the production deploy fails. It automatically puts the previous version back, without waiting for approval, and checks that production works again.
 
-Each job only runs if the one before it passed (`needs:`). Pull requests run build, lint and test, but are never deployed.
+Each job only runs if the one before it passed (`needs:`), except the rollback, which only runs when the production deploy fails. Pull requests run build, lint and test, but are never deployed.
 
 The app is also containerised. The Dockerfile only installs production dependencies, runs as a non-root user, has a `HEALTHCHECK` and doesn't include npm (see section 6).
 
@@ -93,7 +94,8 @@ My pipeline now builds, tests and deploys to staging and production. Looking at 
 
 | Point                      | Why I question it                                                                                       | What I would do                                                        |
 | -------------------------- | ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| **No rollback step**       | If production breaks, I have to redeploy an older version by hand in Render.                            | Add a manual "rollback" workflow that deploys a chosen commit id.      |
+| **The rollback only knows the smoke test** | It only starts when the deploy or the smoke test fails. A bug found later isn't caught. | Re-run the `deploy-production` job of an older green run (possible up to 30 days), or add more checks to the smoke test. |
+| **Rollback by tag, not digest** | The rollback deploys the image by its commit id tag. Tags can in theory be overwritten, a digest can't. | My pipeline never overwrites a commit tag, so it's safe for now. A digest would be stricter. |
 | **Render's free plan**     | Services sleep after about 15 minutes, so the first visit is slow. Fine for school, not for real users. | Use a paid plan or another host for a real product.                    |
 | **In-memory data**         | Every deploy or restart deletes all tasks, and the tests can't check that data is saved.                | Add a database and integration tests against it.                       |
 | **Coverage isn't quality** | High coverage only shows the code was run, not that the tests catch bugs.                               | Mutation testing (for example Stryker).                                |
@@ -111,6 +113,7 @@ I used an AI coding assistant (Claude Code) to help build the pipeline. I treate
 
 - **A misleading error message.** Render said "No public image found, you may be using a private image". My image _was_ public: it could be downloaded without logging in. The real cause was that I used the short commit id, while the pipeline tags images with the full id.
 - **Not every warning needs the same fix.** Trivy reported HIGH vulnerabilities. Instead of updating random packages, I checked where they were: all inside npm from the base image, not in my code. So the right fix was to remove npm from the image.
+- **Checking my rollback against a guide.** I compared my rollback with a guide on rollback jobs in CI/CD. My job already met its best practices (conditional, redeploys a stored image, verifies the result). The guide also warns against separate rollback pipelines, so I dropped my idea of a separate manual rollback workflow.
 - **Not every finding is relevant.** `npm audit` reports issues in my dev tools, but those never end up in the image. I only fail the pipeline on production dependencies.
 
 ### 5.4 Questioning the problem statement and my own assumptions
@@ -143,7 +146,8 @@ On 3 November I got feedback from my learning group teacher.
 | Every job ran `npm ci` again     | One **build** job installs everything; the other jobs reuse it from a cache |
 | Separate `e2e` job               | All tests in one **test** job                                               |
 | Separate `docker` job at the end | Docker build, smoke test and Trivy scan are part of the **build** job       |
-| Image only published             | **Deploy staging** and **deploy production** on Render                      |     |
+| Image only published             | **Deploy staging** and **deploy production** on Render                      |
+| Nothing happened when a deploy failed | An automatic **rollback** job at the end of the pipeline (my teacher asked for this later) |
 
 Some choices I made along the way:
 
@@ -170,11 +174,12 @@ For every goal of the pipeline I checked _how_ it is validated and what the resu
 | No image with known vulnerabilities goes out | Trivy scan before the push                                             | ✅ Proven: the scan went red and blocked the push, then passed after the fix |
 | The right version is deployed                | Deploy jobs compare the commit in `/health` with the commit of the run | ✅ Production showed exactly the commit of the run                           |
 | Nothing goes live without my approval        | GitHub Environment `production` with a required reviewer               | ✅ The job waited until I approved it                                        |
+| A failed production deploy is undone         | A commit with `[simulate failure]` makes the deploy fail on purpose    | ✅ The rollback started by itself and production ran the previous commit again |
 | Only `main` can deploy                       | Branch rule on both environments + `if:` in the workflow               | ✅ Set up, not yet tried with another branch                                 |
 
 ### Quality in numbers
 
-- **Reliability:** 19 pipeline runs so far. 18 were green. The one red run was on purpose (the Trivy scan that found vulnerabilities). Once, a test job failed because it couldn't download the cache. Re-running it fixed it.
+- **Reliability:** 25 pipeline runs so far. 23 were green. Both red runs were on purpose: the Trivy scan that found vulnerabilities, and the rollback test. Once, a test job failed because it couldn't download the cache. Re-running it fixed it.
 - **Speed:** a full run takes about 2–3 minutes without the approval. Build takes 30–50 s, lint 10–15 s, test 25–60 s (the slowest, because of the browser tests) and each deploy 20–30 s.
 - **Deploys:** the deploy jobs don't just call Render, they check the running version. So a green deploy job really means the new version is live.
 
@@ -183,4 +188,5 @@ For every goal of the pipeline I checked _how_ it is validated and what the resu
 - Splitting the pipeline into stages makes it clear _where_ something broke.
 - Different kinds of tests catch different problems. Unit tests check the logic, integration tests check the API, e2e tests check what the user actually sees, and security scans check the things I didn't write myself.
 - Docker makes "it works on my machine" testable: the pipeline runs the same image I run locally, on staging and in production.
+- A deploy isn't finished when it's started. The pipeline has to check the result, and undo it automatically when it goes wrong.
 - Publishing is not deploying. Feedback made me see that a pipeline only really delivers when the app ends up running somewhere.
