@@ -250,6 +250,14 @@ jobs:
           echo "Production did not get the new version within 10 minutes"
           exit 1
 
+      # Only for testing the rollback: a commit with "[simulate failure]" in its message
+      # makes the deploy fail on purpose, so the rollback job takes over.
+      - name: Simulate a failed deploy
+        if: contains(github.event.head_commit.message, '[simulate failure]')
+        run: |
+          echo "Simulating a failed production deploy, the rollback job should take over"
+          exit 1
+
       # The right version is running, but does the app really work?
       # Check the page and the API routes. If one fails, the rollback job takes over.
       - name: Smoke test production
