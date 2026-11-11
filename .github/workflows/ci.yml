@@ -250,6 +250,19 @@ jobs:
           echo "Production did not get the new version within 10 minutes"
           exit 1
 
+      # The right version is running, but does the app really work?
+      # Check the page and the API routes. If one fails, the rollback job takes over.
+      - name: Smoke test production
+        run: |
+          for route in / /api/tasks /api/stats; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "${{ vars.RENDER_URL }}$route")
+            echo "$route -> $code"
+            if [ "$code" != "200" ]; then
+              echo "Production is not working correctly"
+              exit 1
+            fi
+          done
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
