@@ -70,13 +70,22 @@ Before the first e2e run, install the browser once with `npx playwright install 
 GitHub Actions (`.github/workflows/ci.yml`) runs on every push and pull request to `main`:
 
 ```
-build → lint → test → deploy staging → deploy production
+build → lint → test → deploy staging → deploy production → rollback production
 ```
 
 1. **Build**: installs the dependencies and the Playwright browser, and caches them for the next jobs. Builds the Docker image, checks that `/health` answers, and scans the image with Trivy. On `main` it pushes the image to GitHub Container Registry.
 2. **Lint**: ESLint checks the code, and `npm audit` checks the app's dependencies for high or critical vulnerabilities.
 3. **Test**: runs unit and integration tests with coverage (fails below 80%), then the Playwright end-to-end tests. Uploads both reports.
 4. **Deploy staging**: deploys the image of this commit to Render, and waits until staging runs that commit.
-5. **Deploy production**: needs a manual approval in GitHub first. Then deploys the same image to production and tags it `latest`.
+5. **Deploy production**: needs a manual approval in GitHub first. Remembers the version that runs now, deploys the same image as staging, checks the version and smoke tests the page and the API. Then tags the image `latest`.
+6. **Rollback production**: only runs when the production deploy fails. Deploys the previous version again, without approval, and checks that production works.
 
-Each job only runs if the one before it passed. Pull requests run build, lint and test, but are never deployed.
+Each job only runs if the one before it passed, except the rollback, which only runs when the production deploy fails. Pull requests run build, lint and test, but are never deployed.
+
+To test the rollback, push a commit with `[simulate failure]` in its message, for example:
+
+```bash
+git commit --allow-empty -m "test: check that the rollback works [simulate failure]"
+```
+
+The production deploy then fails on purpose and the rollback job takes over.
