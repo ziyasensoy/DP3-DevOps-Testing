@@ -217,7 +217,19 @@ jobs:
     permissions:
       contents: read
       packages: write
+    # Share the version that ran before this deploy, so the rollback job knows what to go back to.
+    outputs:
+      previous: ${{ steps.previous.outputs.commit }}
     steps:
+      # Remember which commit production runs now, before we change it.
+      # Waits up to 2 minutes, because a sleeping Render service is slow to wake up.
+      - name: Remember the current production version
+        id: previous
+        run: |
+          commit=$(curl -s -m 120 "${{ vars.RENDER_URL }}/health" | jq -r '.commit' 2>/dev/null || true)
+          echo "Production runs '$commit' before this deploy"
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+
       # Deploy exactly the same image that was tested on staging.
       - name: Deploy the image to Render
         run: curl -fsS -G "$DEPLOY_HOOK" --data-urlencode "imgURL=$IMAGE:${{ github.sha }}"
