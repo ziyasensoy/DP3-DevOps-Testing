@@ -273,3 +273,55 @@ jobs:
       # Mark this version as "latest", so "latest" always means "what runs in production".
       - name: Tag the image as latest
         run: docker buildx imagetools create -t $IMAGE:latest $IMAGE:${{ github.sha }}
+
+  rollback-production:
+    # Only runs when the production deploy itself failed (not when an earlier job failed),
+    # and only when we know which version ran before.
+    needs: deploy-production
+    if: failure() && needs.deploy-production.result == 'failure' && needs.deploy-production.outputs.previous != ''
+    runs-on: ubuntu-latest
+    # Separate environment without approval: a rollback should not wait for a person.
+    environment:
+      name: production-rollback
+      url: ${{ vars.RENDER_URL }}
+    env:
+      PREVIOUS: ${{ needs.deploy-production.outputs.previous }}
+    steps:
+      # Only roll back to a real commit id, so we never deploy something unknown.
+      - name: Check the previous version
+        run: |
+          if ! echo "$PREVIOUS" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "'$PREVIOUS' is not a commit id, so there is no safe version to go back to."
+            exit 1
+          fi
+          echo "Rolling back production to $PREVIOUS"
+
+      - name: Deploy the previous image to Render
+        run: curl -fsS -G "$DEPLOY_HOOK" --data-urlencode "imgURL=$IMAGE:$PREVIOUS"
+        env:
+          DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+
+      - name: Check that production runs the previous version again
+        run: |
+          for i in $(seq 1 60); do
+            commit=$(curl -s "${{ vars.RENDER_URL }}/health" | jq -r '.commit' 2>/dev/null || true)
+            if [ "$commit" = "$PREVIOUS" ]; then
+              echo "Rollback done: production runs $commit again"
+              exit 0
+            fi
+            echo "Production still runs '$commit', waiting..."
+            sleep 10
+          done
+          echo "Rollback did not finish within 10 minutes"
+          exit 1
+
+      - name: Smoke test production after the rollback
+        run: |
+          for route in / /api/tasks /api/stats; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "${{ vars.RENDER_URL }}$route")
+            echo "$route -> $code"
+            if [ "$code" != "200" ]; then
+              echo "Production still doesn't work after the rollback"
+              exit 1
+            fi
+          done
